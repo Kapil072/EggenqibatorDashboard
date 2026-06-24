@@ -1,0 +1,2026 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Incubator Live Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1563.0.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', 'Segoe UI', sans-serif;
+            background: radial-gradient(circle at 50% 50%, #16161a 0%, #0d0e11 100%);
+            color: #fffffe;
+            min-height: 100vh;
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #7f5af0 0%, #3da9fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .header p {
+            color: #94a1b2;
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+
+        .status-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .status-item {
+            background: rgba(22, 22, 26, 0.7);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 18px 20px;
+            color: #fffffe;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .status-item:hover {
+            transform: translateY(-2px);
+            border-color: rgba(127, 90, 240, 0.3);
+        }
+
+        .status-item strong {
+            display: block;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #94a1b2;
+            margin-bottom: 8px;
+        }
+
+        .status-item span {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .status-item.online {
+            background: rgba(44, 182, 125, 0.08);
+            border-color: rgba(44, 182, 125, 0.2);
+        }
+
+        .status-item.online span {
+            color: #2cb67d;
+        }
+
+        .status-item.offline {
+            background: rgba(255, 90, 95, 0.08);
+            border-color: rgba(255, 90, 95, 0.2);
+        }
+
+        .status-item.offline span {
+            color: #ff5a5f;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: rgba(22, 22, 26, 0.75);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: border-color 0.3s;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .card h3 {
+            color: #fffffe;
+            margin-bottom: 24px;
+            font-size: 1.4rem;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card h3 .hint {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: #94a1b2;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            padding: 10px 16px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 12px;
+            transition: background-color 0.2s;
+        }
+
+        .metric:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #94a1b2;
+        }
+
+        .metric-value {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #fffffe;
+        }
+
+        .metric-value.warning {
+            color: #ff8e3c;
+        }
+
+        .metric-value.error {
+            color: #ff5a5f;
+        }
+
+        .metric-value.success {
+            color: #2cb67d;
+        }
+
+        .control-switch {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            margin: 10px 0;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .control-switch.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .control-switch.active {
+            border-color: rgba(44, 182, 125, 0.3);
+            background: rgba(44, 182, 125, 0.04);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.15);
+            transition: .3s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: #fffffe;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
+        input:checked+.slider {
+            background-color: #2cb67d;
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(24px);
+        }
+
+        .control-label {
+            font-weight: 500;
+            color: #fffffe;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .control-status {
+            font-size: 0.85rem;
+            color: #94a1b2;
+            font-weight: 400;
+        }
+
+        .live-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1.5s infinite;
+        }
+
+        .live-indicator.active {
+            background: #2cb67d;
+            box-shadow: 0 0 8px #2cb67d;
+        }
+
+        .live-indicator.inactive {
+            background: #ff5a5f;
+            animation: none;
+            box-shadow: none;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .chart-container {
+            position: relative;
+            height: 320px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .chart-full {
+            grid-column: 1 / -1;
+        }
+
+        .alert {
+            padding: 14px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            white-space: pre-line;
+            max-width: 1400px;
+            margin-left: auto;
+            margin-right: auto;
+            border: 1px solid transparent;
+        }
+
+        .alert.error {
+            background: rgba(255, 90, 95, 0.08);
+            color: #ff5a5f;
+            border-color: rgba(255, 90, 95, 0.2);
+            border-left: 4px solid #ff5a5f;
+        }
+
+        .alert.warning {
+            background: rgba(255, 142, 60, 0.08);
+            color: #ff8e3c;
+            border-color: rgba(255, 142, 60, 0.2);
+            border-left: 4px solid #ff8e3c;
+        }
+
+        .alert.success {
+            background: rgba(44, 182, 125, 0.08);
+            color: #2cb67d;
+            border-color: rgba(44, 182, 125, 0.2);
+            border-left: 4px solid #2cb67d;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #94a1b2;
+            font-size: 0.9rem;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            color: #fffffe;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #7f5af0;
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: 0 0 10px rgba(127, 90, 240, 0.2);
+        }
+
+        .control-button {
+            background: linear-gradient(135deg, #7f5af0 0%, #6246ea 100%);
+            color: #fffffe;
+            border: none;
+            padding: 12px 22px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin: 4px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(127, 90, 240, 0.2);
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(127, 90, 240, 0.35);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .control-button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .control-button.secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fffffe;
+            box-shadow: none;
+        }
+
+        .control-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .settings-panel {
+            background: rgba(22, 22, 26, 0.75);
+            border-radius: 20px;
+            padding: 28px;
+            margin-top: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(16px);
+        }
+
+        .settings-panel h3 {
+            color: #fffffe;
+            margin-bottom: 8px;
+            font-size: 1.4rem;
+            font-weight: 600;
+        }
+
+        .settings-panel .subtext {
+            color: #94a1b2;
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+
+        .data-freshness {
+            font-size: 0.85rem;
+            color: #94a1b2;
+            text-align: center;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        .data-freshness.fresh {
+            color: #2cb67d;
+        }
+
+        .data-freshness.stale {
+            color: #ff8e3c;
+        }
+
+        .data-freshness.old {
+            color: #ff5a5f;
+        }
+
+        .download-progress {
+            background: rgba(22, 22, 26, 0.85);
+            border-radius: 16px;
+            padding: 24px;
+            margin: 24px auto;
+            max-width: 1400px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #7f5af0, #3da9fc);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        #downloadStatus {
+            font-size: 0.9rem;
+            color: #fffffe;
+            margin-bottom: 4px;
+        }
+
+        #downloadStats {
+            font-size: 0.85rem;
+            color: #94a1b2;
+        }
+
+        .download-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .section-divider {
+            border: 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            margin: 24px 0;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .status-bar {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .header h1 {
+                font-size: 2.2rem;
+            }
+
+            .control-button {
+                padding: 10px 16px;
+                font-size: 0.85rem;
+                width: 100%;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
+
+            .download-options {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .status-bar {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Login Overlay Styles */
+        #loginOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 50%, #16161a 0%, #0d0e11 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .login-box {
+            background: rgba(22, 22, 26, 0.75);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(16px);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-box h2 {
+            margin-bottom: 20px;
+            font-size: 2rem;
+            color: #fffffe;
+        }
+        .login-box input {
+            width: 100%;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: #fffffe;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .login-box input:focus {
+            outline: none;
+            border-color: #7f5af0;
+            box-shadow: 0 0 10px rgba(127, 90, 240, 0.2);
+        }
+        .login-box button {
+            width: 100%;
+            background: linear-gradient(135deg, #7f5af0 0%, #6246ea 100%);
+            color: #fffffe;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .login-box button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(127, 90, 240, 0.35);
+        }
+        #dashboardContent {
+            display: none; /* Hidden by default until login */
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Login Overlay -->
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2>🔒 Dashboard Login</h2>
+            <p style="color: #94a1b2; margin-bottom: 20px;">Enter password to access</p>
+            <input type="password" id="loginPassword" placeholder="Password" onkeypress="if(event.key === 'Enter') checkLogin()">
+            <button onclick="checkLogin()">Login</button>
+            <p id="loginError" style="color: #ff5a5f; margin-top: 15px; display: none;">Incorrect password</p>
+        </div>
+    </div>
+
+    <div class="container" id="dashboardContent">
+        <div class="header">
+            <h1>🥚 ESP32 Incubator Live Dashboard</h1>
+            <p>Real-time MQTT control and telemetry monitoring</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item" id="dataStatus">
+                <strong>Data Stream</strong><br>
+                <span class="live-indicator inactive" id="dataIndicator"></span>
+                <span id="dataText">Waiting...</span>
+            </div>
+            <div class="status-item" id="awsStatus">
+                <strong>AWS Connection</strong><br>
+                <span class="live-indicator inactive" id="awsIndicator"></span>
+                <span id="awsText">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <strong>Device</strong><br>
+                <span id="deviceId">Test_03</span>
+            </div>
+            <div class="status-item">
+                <strong>Last Update</strong><br>
+                <span id="lastUpdate">--</span>
+            </div>
+            <div class="status-item">
+                <strong>Updates Received</strong><br>
+                <span id="updateCount">0</span>
+            </div>
+        </div>
+
+        <div id="alerts"></div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>📡 Live Environmental Data</h3>
+                <div class="metric">
+                    <span class="metric-label">DS Temperature</span>
+                    <span class="metric-value" id="dsTemp">-- °C</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">SHT Temperature</span>
+                    <span class="metric-value" id="shtTemp">-- °C</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Humidity</span>
+                    <span class="metric-value" id="shtHum">-- %</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Tank Status</span>
+                    <span class="metric-value" id="tankFull">Normal</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Sensor Status</span>
+                    <span class="metric-value" id="sensorError">Normal</span>
+                </div>
+                <div class="data-freshness" id="dataFreshness">
+                    Waiting for data...
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🎛️ Smart Control Panel</h3>
+
+                <div class="control-switch" id="autoModeSwitch">
+                    <div class="control-label">
+                        <span>🤖 Auto Mode</span>
+                        <div class="control-status" id="autoModeStatus">Manual Control Active</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="autoModeToggle" onchange="toggleAutoMode()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div id="manualControls">
+                    <div class="control-switch" id="heat1Switch">
+                        <div class="control-label">
+                            <span>🔥 Heater 1</span>
+                            <div class="control-status" id="heat1Status">OFF</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="heat1Toggle" onchange="toggleControl('heat1')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="control-switch" id="heat2Switch">
+                        <div class="control-label">
+                            <span>🔥 Heater 2</span>
+                            <div class="control-status" id="heat2Status">OFF</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="heat2Toggle" onchange="toggleControl('heat2')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="control-switch" id="humidifierSwitch">
+                        <div class="control-label">
+                            <span>💧 Humidifier</span>
+                            <div class="control-status" id="humidifierStatus">OFF</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="humidifierToggle" onchange="toggleControl('humidifier')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-switch" id="lightSwitch">
+                    <div class="control-label">
+                        <span>💡 Light</span>
+                        <div class="control-status" id="lightStatus">OFF</div>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="lightToggle" onchange="toggleControl('light')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div id="tiltControls">
+                    <div class="control-switch" id="tiltUpSwitch">
+                        <div class="control-label">
+                            <span>⬆️ Tilt Up</span>
+                            <div class="control-status" id="tiltUpStatus">STOP</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="tiltUpToggle" onchange="toggleTilt('tiltUp')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="control-switch" id="tiltDnSwitch">
+                        <div class="control-label">
+                            <span>⬇️ Tilt Down</span>
+                            <div class="control-status" id="tiltDnStatus">STOP</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" id="tiltDnToggle" onchange="toggleTilt('tiltDn')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="metric" style="margin-top: 15px;">
+                    <span class="metric-label">Current Tilt Status</span>
+                    <span class="metric-value" id="tiltStatus">STOP</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>⚙️ System Settings</h3>
+                <div class="input-group">
+                    <label for="tempThresholdInput">Temperature Threshold (°C)</label>
+                    <input type="number" id="tempThresholdInput" step="0.1" placeholder="37.5">
+                </div>
+                <div class="input-group">
+                    <label for="humThresholdInput">Humidity Threshold (%)</label>
+                    <input type="number" id="humThresholdInput" step="1" placeholder="40">
+                </div>
+                <div class="input-group">
+                    <label for="schedIntervalInput">Tilt Schedule Interval (minutes)</label>
+                    <input type="number" id="schedIntervalInput" step="1" placeholder="60">
+                </div>
+                <button class="control-button" onclick="updateThresholds()" style="width: 100%; margin-top: 6px;">
+                    📤 Update Settings
+                </button>
+                <hr class="section-divider">
+                <div class="metric">
+                    <span class="metric-label">Current Temp Threshold</span>
+                    <span class="metric-value" id="currentTempThreshold">-- °C</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Current Hum Threshold</span>
+                    <span class="metric-value" id="currentHumThreshold">-- %</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Current Interval</span>
+                    <span class="metric-value" id="currentInterval">-- min</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🔧 System Status</h3>
+                <div class="metric">
+                    <span class="metric-label">Fan</span>
+                    <span class="metric-value" id="fanStatus">OFF</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">ESP32 Timestamp</span>
+                    <span class="metric-value" id="espTimestamp">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Data Age</span>
+                    <span class="metric-value" id="dataAge">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Update Frequency</span>
+                    <span class="metric-value" id="updateFreq">--</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Total Historical Records</span>
+                    <span class="metric-value" id="totalRecords">0</span>
+                </div>
+                <hr class="section-divider">
+                <div class="button-row">
+                    <button class="control-button secondary" onclick="connectServices()">🔗 Reconnect AWS</button>
+                    <button class="control-button secondary" onclick="startLiveData()">▶️ Start Live</button>
+                    <button class="control-button secondary" onclick="stopLiveData()">⏹️ Stop Live</button>
+                    <button class="control-button secondary" onclick="testCommand()">🧪 Test Command</button>
+                </div>
+                <div class="input-group" style="margin-top: 15px;">
+                    <label for="pollInterval">Data Refresh Rate</label>
+                    <select id="pollInterval" onchange="if (isConnected) startLiveData();">
+                        <option value="1000">1 second (Fast)</option>
+                        <option value="2000" selected>2 seconds (Normal)</option>
+                        <option value="5000">5 seconds (Slow)</option>
+                        <option value="10000">10 seconds (Very Slow)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card chart-full">
+                <h3>🌡️ Live Temperature <span class="hint">last 30 readings</span></h3>
+                <div class="chart-container">
+                    <canvas id="realtimeTempChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-full">
+                <h3>💧 Live Humidity <span class="hint">last 30 readings</span></h3>
+                <div class="chart-container">
+                    <canvas id="realtimeHumChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-full">
+                <h3>⚖️ Live Tilt Position <span class="hint">last 30 readings</span></h3>
+                <div class="chart-container">
+                    <canvas id="realtimeTiltChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-full">
+                <h3>📆 Historical Temperature <span class="hint">load via button below</span></h3>
+                <div class="chart-container">
+                    <canvas id="historicalTempChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-full">
+                <h3>📆 Historical Humidity <span class="hint">load via button below</span></h3>
+                <div class="chart-container">
+                    <canvas id="historicalHumChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card chart-full">
+                <h3>📆 Historical Tilt Position <span class="hint">load via button below</span></h3>
+                <div class="chart-container">
+                    <canvas id="historicalTiltChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-panel">
+            <h3>📊 Data Export</h3>
+            <p class="subtext">AWS access is configured directly in the code (see <code>AWS_CONFIG</code> near the top
+                of the script). This panel is just for exporting historical data.</p>
+
+            <div class="download-options">
+                <div class="input-group">
+                    <label for="exportDevice">Device ID</label>
+                    <input type="text" id="exportDevice" value="Test_03" placeholder="Device ID">
+                </div>
+                <div class="input-group">
+                    <label for="exportDays">Days of Data</label>
+                    <select id="exportDays">
+                        <option value="1">Last 1 Day</option>
+                        <option value="7">Last 7 Days</option>
+                        <option value="30" selected>Last 30 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="365">Last 1 Year</option>
+                        <option value="all">All Data</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="exportFormat">Export Format</label>
+                    <select id="exportFormat">
+                        <option value="csv">CSV (Excel Compatible)</option>
+                        <option value="json">JSON (Raw Data)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="button-row" style="margin-top: 10px;">
+                <button class="control-button" onclick="getDataStatistics()">📈 Get Statistics</button>
+                <button class="control-button" onclick="refreshHistoricalData()">📊 Load Historical Data</button>
+                <button class="control-button" onclick="downloadCSV()">📥 Download CSV</button>
+                <button class="control-button" onclick="downloadAllData()">📦 Download (Custom Range/Format)</button>
+            </div>
+
+            <div class="download-progress" id="downloadProgress">
+                <h3>📥 Downloading Data...</h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div id="downloadStatus">Preparing download...</div>
+                <div id="downloadStats">Records: 0 | Size: 0 KB</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DASHBOARD_PASSWORD = "admin"; // Default password
+
+        function checkLogin() {
+            const pwd = document.getElementById('loginPassword').value;
+            if (pwd === DASHBOARD_PASSWORD) {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+                document.getElementById('loginError').style.display = 'none';
+                sessionStorage.setItem('dashboard_logged_in', 'true');
+                
+                if (!isConnected) {
+                    connectServices();
+                }
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+            }
+        }
+        // ==========================================
+        // AWS CONFIGURATION
+        // ==========================================
+        const AWS_CONFIG = {
+            accessKeyId: "AKIARSZIUYWQSM33TKHK",
+            secretAccessKey: "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",
+            region: "us-east-1",
+            iotEndpoint: "a9bf9n5q4qst2-ats.iot.us-east-1.amazonaws.com",
+            tableName: "IncubatorTelementry",
+            defaultDeviceId: "Test_03",
+            commandTopic: "kapil/commands"
+        };
+        // ==========================================
+
+        // Global variables
+        let dynamodb = null;
+        let iotData = null;
+
+        let realtimeTempChart = null;
+        let realtimeHumChart = null;
+        let realtimeTiltChart = null;
+        let historicalTempChart = null;
+        let historicalHumChart = null;
+        let historicalTiltChart = null;
+
+        let isConnected = false;
+        let liveDataInterval = null;
+        let currentData = {};
+        let realtimeData = [];
+        let historicalData = [];
+        let updateCount = 0;
+        let lastUpdateTime = 0;
+        let lastBucketTimestamps = [0, 0, 0];
+        let lastNewDataAt = 0;
+        let commandCooldownUntil = 0;
+
+        // Load control states
+        let controlStates = (function () {
+            try {
+                const saved = localStorage.getItem('incubator_controlStates');
+                if (saved) return JSON.parse(saved);
+            } catch (e) { }
+            return {
+                autoMode: true,
+                heat1: false,
+                heat2: false,
+                humidifier: false,
+                light: false,
+                tiltUp: false,
+                tiltDn: false
+            };
+        })();
+
+        function saveControlStates() {
+            try {
+                localStorage.setItem('incubator_controlStates', JSON.stringify(controlStates));
+            } catch (e) { }
+        }
+
+        function getBaseChartOptions() {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 300 },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { color: '#fffffe', font: { family: 'Outfit' } }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                        ticks: { color: '#94a1b2', font: { family: 'Outfit' } }
+                    }
+                }
+            };
+        }
+
+        function getTempChartConfig() {
+            let options = getBaseChartOptions();
+            options.scales.y = {
+                type: 'linear', display: true, position: 'left',
+                title: { display: true, text: 'Temperature (°C)', color: '#fffffe', font: { family: 'Outfit', weight: 'bold' } },
+                grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                ticks: { color: '#94a1b2', font: { family: 'Outfit' } }
+            };
+            return {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'DS Temperature (°C)', data: [], borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.05)', tension: 0.4, pointRadius: 3 },
+                        { label: 'SHT Temperature (°C)', data: [], borderColor: '#3da9fc', backgroundColor: 'rgba(61, 169, 252, 0.05)', tension: 0.4, pointRadius: 3 }
+                    ]
+                },
+                options: options
+            };
+        }
+
+        function getHumChartConfig() {
+            let options = getBaseChartOptions();
+            options.scales.y = {
+                type: 'linear', display: true, position: 'left',
+                title: { display: true, text: 'Humidity (%)', color: '#fffffe', font: { family: 'Outfit', weight: 'bold' } },
+                grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                ticks: { color: '#94a1b2', font: { family: 'Outfit' } }
+            };
+            return {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Humidity (%)', data: [], borderColor: '#2cb67d', backgroundColor: 'rgba(44, 182, 125, 0.05)', tension: 0.4, pointRadius: 3 }
+                    ]
+                },
+                options: options
+            };
+        }
+
+        function getTiltChartConfig() {
+            let options = getBaseChartOptions();
+            options.scales.y = {
+                type: 'linear', display: true, position: 'left',
+                min: -1.5, max: 1.5,
+                title: { display: true, text: 'Tilt Position', color: '#fffffe', font: { family: 'Outfit', weight: 'bold' } },
+                grid: { color: 'rgba(255, 255, 255, 0.06)' },
+                ticks: {
+                    color: '#94a1b2', font: { family: 'Outfit' },
+                    stepSize: 1,
+                    callback: function (value) {
+                        if (value === 1) return 'UP';
+                        if (value === 0) return 'STOP';
+                        if (value === -1) return 'DOWN';
+                        return '';
+                    }
+                }
+            };
+            return {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Tilt Status', data: [], borderColor: '#f582ae', backgroundColor: 'rgba(245, 130, 174, 0.05)', stepped: true, pointRadius: 3 }
+                    ]
+                },
+                options: options
+            };
+        }
+
+        // Initialize Live Charts
+        function initChart() {
+            realtimeTempChart = new Chart(document.getElementById('realtimeTempChart').getContext('2d'), getTempChartConfig());
+            realtimeHumChart = new Chart(document.getElementById('realtimeHumChart').getContext('2d'), getHumChartConfig());
+            realtimeTiltChart = new Chart(document.getElementById('realtimeTiltChart').getContext('2d'), getTiltChartConfig());
+        }
+
+        // Initialize Historical Charts
+        function initHistoricalChart() {
+            historicalTempChart = new Chart(document.getElementById('historicalTempChart').getContext('2d'), getTempChartConfig());
+            historicalHumChart = new Chart(document.getElementById('historicalHumChart').getContext('2d'), getHumChartConfig());
+            historicalTiltChart = new Chart(document.getElementById('historicalTiltChart').getContext('2d'), getTiltChartConfig());
+        }
+
+        // Connect to AWS services
+        async function connectServices() {
+            const accessKey = AWS_CONFIG.accessKeyId;
+            const secretKey = AWS_CONFIG.secretAccessKey;
+            const region = AWS_CONFIG.region;
+            const iotEndpoint = AWS_CONFIG.iotEndpoint;
+
+            if (!accessKey || accessKey.startsWith('PASTE_') || !secretKey || secretKey.startsWith('PASTE_')) {
+                showAlert('⚠️ AWS credentials are not set. Open the file and fill in AWS_CONFIG near the top of the script.', 'error');
+                updateStatus('aws', 'offline');
+                return;
+            }
+
+            try {
+                AWS.config.update({
+                    accessKeyId: accessKey,
+                    secretAccessKey: secretKey,
+                    region: region
+                });
+
+                dynamodb = new AWS.DynamoDB.DocumentClient();
+
+                if (iotEndpoint && !iotEndpoint.startsWith('PASTE_')) {
+                    iotData = new AWS.IotData({
+                        endpoint: `https://${iotEndpoint}`
+                    });
+                } else {
+                    showAlert('ℹ️ No IoT endpoint set — telemetry will still load, but control commands cannot be sent until AWS_CONFIG.iotEndpoint is filled in.', 'warning');
+                }
+
+                document.getElementById('exportDevice').value = AWS_CONFIG.defaultDeviceId;
+                document.getElementById('deviceId').textContent = AWS_CONFIG.defaultDeviceId;
+
+                updateStatus('aws', 'online');
+                showAlert('AWS services connected successfully!', 'success');
+                isConnected = true;
+
+                if (iotData) {
+                    try {
+                        await iotData.publish({
+                            topic: AWS_CONFIG.commandTopic,
+                            payload: JSON.stringify({ sync: true })
+                        }).promise();
+                        showAlert('📡 Sync ping sent to ESP — waiting for fresh data...', 'success');
+                    } catch (e) {
+                        console.warn('Sync ping failed:', e);
+                    }
+                }
+
+                setTimeout(() => startLiveData(), 2000);
+
+            } catch (error) {
+                showAlert('Connection failed: ' + error.message, 'error');
+                updateStatus('aws', 'offline');
+            }
+        }
+
+        function startLiveData() {
+            if (!isConnected || !dynamodb) {
+                showAlert('Please connect to AWS first', 'warning');
+                return;
+            }
+
+            if (liveDataInterval) {
+                clearInterval(liveDataInterval);
+            }
+
+            const pollInterval = parseInt(document.getElementById('pollInterval').value);
+
+            liveDataInterval = setInterval(fetchLatestData, pollInterval);
+            updateStatus('data', 'online');
+            showAlert(`Live data started (${pollInterval / 1000}s refresh)`, 'success');
+
+            fetchLatestData();
+        }
+
+        function stopLiveData() {
+            if (liveDataInterval) {
+                clearInterval(liveDataInterval);
+                liveDataInterval = null;
+            }
+            updateStatus('data', 'offline');
+            showAlert('Live data stopped', 'warning');
+        }
+
+        async function fetchLatestData() {
+            if (!dynamodb) return;
+
+            try {
+                const currentDeviceId = document.getElementById('exportDevice')?.value || AWS_CONFIG.defaultDeviceId;
+
+                const params = {
+                    TableName: AWS_CONFIG.tableName,
+                    KeyConditionExpression: 'deviceId = :deviceId',
+                    ExpressionAttributeValues: { ':deviceId': currentDeviceId },
+                    ScanIndexForward: false,
+                    Limit: 1
+                };
+
+                const result = await dynamodb.query(params).promise();
+
+                if (result.Items && result.Items.length > 0) {
+                    const latestData = result.Items[0];
+
+                    if (latestData.timestamp !== lastUpdateTime || lastUpdateTime === 0) {
+                        handleNewData(latestData);
+                        lastUpdateTime = latestData.timestamp;
+                        updateCount++;
+                        document.getElementById('updateCount').textContent = updateCount;
+                    }
+
+                    updateDataFreshness(latestData.timestamp);
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                updateStatus('data', 'offline');
+            }
+        }
+
+        function handleNewData(data) {
+            currentData = data;
+            lastNewDataAt = Date.now();
+            updateLiveDisplay(data);
+            addToChart(data);
+            updateControlStatesFromData(data);
+            saveControlStates();
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+        }
+
+        function updateLiveDisplay(data) {
+            document.getElementById('dsTemp').textContent = `${data.dsTemp ?? '--'} °C`;
+            document.getElementById('shtTemp').textContent = `${data.shtTemp ?? '--'} °C`;
+            document.getElementById('shtHum').textContent = `${data.shtHum ?? '--'} %`;
+
+            const tankElement = document.getElementById('tankFull');
+            tankElement.textContent = data.tankFull ? 'FULL' : 'EMPTY';
+            tankElement.className = `metric-value ${data.tankFull ? 'success' : 'error'}`;
+
+            const sensorElement = document.getElementById('sensorError');
+            sensorElement.textContent = data.sensorError ? 'ERROR' : 'Normal';
+            sensorElement.className = `metric-value ${data.sensorError ? 'error' : 'success'}`;
+
+            document.getElementById('espTimestamp').textContent = data.timestamp ?? '--';
+            document.getElementById('fanStatus').textContent = data.fan ? 'ON' : 'OFF';
+
+            document.getElementById('currentTempThreshold').textContent = `${data.tempThreshold ?? '--'} °C`;
+            document.getElementById('currentHumThreshold').textContent = `${data.humThreshold ?? '--'} %`;
+            document.getElementById('currentInterval').textContent = `${data.schedIntervalMin ?? '--'} min`;
+
+            document.getElementById('tiltStatus').textContent = data.tiltStatus || 'STOP';
+        }
+
+        function updateControlStatesFromData(data) {
+            const inCooldown = Date.now() < commandCooldownUntil;
+
+            if (!inCooldown) {
+                controlStates.autoMode = data.autoMode || false;
+                controlStates.heat1 = data.heat1 || false;
+                controlStates.heat2 = data.heat2 || false;
+                controlStates.humidifier = data.humidifier || false;
+                controlStates.light = data.light || false;
+
+                document.getElementById('autoModeToggle').checked = controlStates.autoMode;
+                document.getElementById('heat1Toggle').checked = controlStates.heat1;
+                document.getElementById('heat2Toggle').checked = controlStates.heat2;
+                document.getElementById('humidifierToggle').checked = controlStates.humidifier;
+                document.getElementById('lightToggle').checked = controlStates.light;
+
+                const tiltStatus = data.tiltStatus || 'STOP';
+                controlStates.tiltUp = tiltStatus === 'UP';
+                controlStates.tiltDn = tiltStatus === 'DOWN';
+
+                document.getElementById('tiltUpToggle').checked = controlStates.tiltUp;
+                document.getElementById('tiltDnToggle').checked = controlStates.tiltDn;
+            }
+
+            updateControlUI();
+        }
+
+        function updateControlUI() {
+            const autoModeStatus = document.getElementById('autoModeStatus');
+            const autoModeSwitch = document.getElementById('autoModeSwitch');
+
+            if (controlStates.autoMode) {
+                autoModeStatus.textContent = 'Automatic Control Active';
+                autoModeSwitch.classList.add('active');
+            } else {
+                autoModeStatus.textContent = 'Manual Control Active';
+                autoModeSwitch.classList.remove('active');
+            }
+
+            const manualControls = ['heat1Switch', 'heat2Switch', 'humidifierSwitch'];
+            manualControls.forEach(controlId => {
+                const element = document.getElementById(controlId);
+                const toggle = element.querySelector('input');
+
+                if (controlStates.autoMode) {
+                    element.classList.add('disabled');
+                    toggle.disabled = true;
+                } else {
+                    element.classList.remove('disabled');
+                    toggle.disabled = false;
+                }
+            });
+
+            const tiltElements = ['tiltUpSwitch', 'tiltDnSwitch'];
+            tiltElements.forEach(controlId => {
+                const element = document.getElementById(controlId);
+                const toggle = element.querySelector('input');
+                if (controlStates.autoMode) {
+                    element.classList.add('disabled');
+                    toggle.disabled = true;
+                } else {
+                    element.classList.remove('disabled');
+                    toggle.disabled = false;
+                }
+            });
+
+            document.getElementById('heat1Status').textContent = controlStates.heat1 ? 'ON' : 'OFF';
+            document.getElementById('heat2Status').textContent = controlStates.heat2 ? 'ON' : 'OFF';
+            document.getElementById('humidifierStatus').textContent = controlStates.humidifier ? 'ON' : 'OFF';
+            document.getElementById('lightStatus').textContent = controlStates.light ? 'ON' : 'OFF';
+            document.getElementById('tiltUpStatus').textContent = controlStates.tiltUp ? 'ACTIVE' : 'STOP';
+            document.getElementById('tiltDnStatus').textContent = controlStates.tiltDn ? 'ACTIVE' : 'STOP';
+
+            const switches = {
+                'heat1Switch': controlStates.heat1,
+                'heat2Switch': controlStates.heat2,
+                'humidifierSwitch': controlStates.humidifier,
+                'lightSwitch': controlStates.light,
+                'tiltUpSwitch': controlStates.tiltUp,
+                'tiltDnSwitch': controlStates.tiltDn
+            };
+
+            Object.keys(switches).forEach(switchId => {
+                const element = document.getElementById(switchId);
+                if (switches[switchId]) {
+                    element.classList.add('active');
+                } else {
+                    element.classList.remove('active');
+                }
+            });
+        }
+
+        function addToChart(data) {
+            const now = new Date().toLocaleTimeString();
+
+            let tiltVal = 0;
+            if (data.tiltStatus === 'UP') tiltVal = 1;
+            else if (data.tiltStatus === 'DOWN') tiltVal = -1;
+
+            realtimeData.push({
+                time: now,
+                dsTemp: data.dsTemp || 0,
+                shtTemp: data.shtTemp || 0,
+                shtHum: data.shtHum || 0,
+                tilt: tiltVal
+            });
+
+            if (realtimeData.length > 30) {
+                realtimeData.shift();
+            }
+
+            const labels = realtimeData.map(d => d.time);
+
+            realtimeTempChart.data.labels = labels;
+            realtimeTempChart.data.datasets[0].data = realtimeData.map(d => d.dsTemp);
+            realtimeTempChart.data.datasets[1].data = realtimeData.map(d => d.shtTemp);
+            realtimeTempChart.update('active');
+
+            realtimeHumChart.data.labels = labels;
+            realtimeHumChart.data.datasets[0].data = realtimeData.map(d => d.shtHum);
+            realtimeHumChart.update('active');
+
+            realtimeTiltChart.data.labels = labels;
+            realtimeTiltChart.data.datasets[0].data = realtimeData.map(d => d.tilt);
+            realtimeTiltChart.update('active');
+        }
+
+        function updateDataFreshness(timestamp) {
+            const ageElement = document.getElementById('dataAge');
+            const freshnessElement = document.getElementById('dataFreshness');
+
+            const wallAge = lastNewDataAt > 0 ? (Date.now() - lastNewDataAt) / 1000 : 9999;
+
+            let ageText, freshnessText, freshnessClass;
+
+            if (wallAge < 10) {
+                ageText = 'Live';
+                freshnessText = '🟢 Device is online — data is live';
+                freshnessClass = 'fresh';
+            } else if (wallAge < 30) {
+                ageText = `${Math.floor(wallAge)}s ago`;
+                freshnessText = '🟡 Data is recent';
+                freshnessClass = 'stale';
+            } else if (wallAge < 120) {
+                ageText = `${Math.floor(wallAge)}s ago`;
+                freshnessText = '🟠 Device may be offline';
+                freshnessClass = 'stale';
+            } else {
+                const mins = Math.floor(wallAge / 60);
+                ageText = mins > 60 ? `${Math.floor(mins / 60)}h ago` : `${mins}m ago`;
+                freshnessText = '🔴 Device is offline — no new data';
+                freshnessClass = 'old';
+            }
+
+            ageElement.textContent = ageText;
+            freshnessElement.textContent = freshnessText;
+            freshnessElement.className = `data-freshness ${freshnessClass}`;
+        }
+
+        async function sendCommand(command) {
+            if (!iotData) {
+                showAlert('IoT endpoint not configured in AWS_CONFIG. Commands cannot be sent.', 'warning');
+                return;
+            }
+
+            try {
+                const params = {
+                    topic: AWS_CONFIG.commandTopic,
+                    payload: JSON.stringify(command)
+                };
+
+                await iotData.publish(params).promise();
+                commandCooldownUntil = Date.now() + 8000;
+                showAlert(`✅ Command sent: ${JSON.stringify(command)}`, 'success');
+            } catch (error) {
+                showAlert('❌ Failed to send command: ' + error.message, 'error');
+            }
+        }
+
+        function toggleAutoMode() {
+            const newState = document.getElementById('autoModeToggle').checked;
+            controlStates.autoMode = newState;
+
+            updateControlUI();
+            saveControlStates();
+            sendCommand({ autoMode: newState });
+        }
+
+        function toggleControl(control) {
+            const toggleId = control + 'Toggle';
+            const newState = document.getElementById(toggleId).checked;
+
+            if (controlStates.autoMode && ['heat1', 'heat2', 'humidifier'].includes(control)) {
+                showAlert('Cannot control heating/humidity in auto mode', 'warning');
+                document.getElementById(toggleId).checked = !newState;
+                return;
+            }
+
+            controlStates[control] = newState;
+            const command = {};
+            command[control] = newState;
+            saveControlStates();
+            sendCommand(command);
+        }
+
+        function toggleTilt(direction) {
+            const newState = document.getElementById(direction + 'Toggle').checked;
+
+            if (controlStates.autoMode) {
+                showAlert('Cannot control tilt in auto mode', 'warning');
+                document.getElementById(direction + 'Toggle').checked = !newState;
+                return;
+            }
+
+            const otherDirection = direction === 'tiltUp' ? 'tiltDn' : 'tiltUp';
+            document.getElementById(otherDirection + 'Toggle').checked = false;
+
+            controlStates[direction] = newState;
+            controlStates[otherDirection] = false;
+
+            const command = {};
+            command[direction] = newState;
+            command[otherDirection] = false;
+
+            saveControlStates();
+            sendCommand(command);
+        }
+
+        function updateThresholds() {
+            const tempThreshold = parseFloat(document.getElementById('tempThresholdInput').value);
+            const humThreshold = parseFloat(document.getElementById('humThresholdInput').value);
+            const schedInterval = parseInt(document.getElementById('schedIntervalInput').value);
+
+            const command = {};
+            if (!isNaN(tempThreshold)) command.tempThreshold = tempThreshold;
+            if (!isNaN(humThreshold)) command.humThreshold = humThreshold;
+            if (!isNaN(schedInterval)) command.schedIntervalMin = schedInterval;
+
+            if (Object.keys(command).length > 0) {
+                sendCommand(command);
+            } else {
+                showAlert('Please enter at least one valid value', 'warning');
+            }
+        }
+
+        function testCommand() {
+            const testCmd = { test: true, timestamp: Math.floor(Date.now() / 1000) };
+            sendCommand(testCmd);
+        }
+
+        function updateStatus(service, status) {
+            const indicator = document.getElementById(service + 'Indicator');
+            const text = document.getElementById(service + 'Text');
+
+            if (status === 'online') {
+                indicator.className = 'live-indicator active';
+                text.textContent = service === 'data' ? 'Live' : 'Connected';
+            } else {
+                indicator.className = 'live-indicator inactive';
+                text.textContent = service === 'data' ? 'Stopped' : 'Disconnected';
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertsContainer = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.textContent = message;
+
+            alertsContainer.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 6000);
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function updateDownloadProgress(percentage, message) {
+            document.getElementById('progressFill').style.width = percentage + '%';
+            document.getElementById('downloadStatus').textContent = message;
+        }
+
+        function downloadCSVFile(data, deviceId, daysFilter) {
+            if (data.length === 0) return;
+
+            const allHeaders = new Set();
+            data.forEach(item => {
+                Object.keys(item).forEach(key => allHeaders.add(key));
+            });
+
+            const headers = Array.from(allHeaders).sort();
+
+            const csvRows = [
+                headers.join(','),
+                ...data.map(row =>
+                    headers.map(header => {
+                        const value = row[header];
+                        if (value === null || value === undefined) return '';
+                        if (typeof value === 'string' && value.includes(',')) {
+                            return `"${value.replace(/"/g, '""')}"`;
+                        }
+                        return value;
+                    }).join(',')
+                )
+            ];
+
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+
+            const dateStr = new Date().toISOString().split('T')[0];
+            const filename = `incubator_${deviceId}_${daysFilter}days_${dateStr}.csv`;
+
+            downloadBlob(blob, filename);
+        }
+
+        function downloadJSONFile(data, deviceId, daysFilter) {
+            const jsonContent = JSON.stringify({
+                exportInfo: {
+                    deviceId: deviceId,
+                    daysFilter: daysFilter,
+                    recordCount: data.length,
+                    exportDate: new Date().toISOString(),
+                    timeRange: {
+                        oldest: data.length > 0 ? new Date(data[0].timestamp * 1000).toISOString() : null,
+                        newest: data.length > 0 ? new Date(data[data.length - 1].timestamp * 1000).toISOString() : null
+                    }
+                },
+                data: data
+            }, null, 2);
+
+            const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+
+            const dateStr = new Date().toISOString().split('T')[0];
+            const filename = `incubator_${deviceId}_${daysFilter}days_${dateStr}.json`;
+
+            downloadBlob(blob, filename);
+        }
+
+        async function downloadAllData() {
+            if (!dynamodb) {
+                showAlert('Please connect to AWS first', 'warning');
+                return;
+            }
+
+            const deviceId = document.getElementById('exportDevice').value || AWS_CONFIG.defaultDeviceId;
+            const daysFilter = document.getElementById('exportDays').value;
+            const exportFormat = document.getElementById('exportFormat').value;
+
+            try {
+                document.getElementById('downloadProgress').style.display = 'block';
+                updateDownloadProgress(0, 'Initializing download...');
+
+                let allData = [];
+                let lastEvaluatedKey = null;
+                let pageCount = 0;
+                let totalSize = 0;
+
+                let filterExpression = null;
+                let expressionAttributeValues = {
+                    ':deviceId': deviceId
+                };
+
+                if (daysFilter !== 'all') {
+                    const daysAgo = parseInt(daysFilter);
+                    const cutoffTime = Math.floor((Date.now() - (daysAgo * 24 * 60 * 60 * 1000)) / 1000);
+                    filterExpression = '#ts >= :cutoffTime';
+                    expressionAttributeValues[':cutoffTime'] = cutoffTime;
+                }
+
+                updateDownloadProgress(10, 'Starting data retrieval...');
+
+                do {
+                    const params = {
+                        TableName: AWS_CONFIG.tableName,
+                        KeyConditionExpression: 'deviceId = :deviceId',
+                        ExpressionAttributeValues: expressionAttributeValues,
+                        ScanIndexForward: false,
+                        Limit: 1000
+                    };
+
+                    if (filterExpression) {
+                        params.FilterExpression = filterExpression;
+                        params.ExpressionAttributeNames = { '#ts': 'timestamp' };
+                    }
+
+                    if (lastEvaluatedKey) {
+                        params.ExclusiveStartKey = lastEvaluatedKey;
+                    }
+
+                    updateDownloadProgress(
+                        Math.min(90, 10 + (pageCount * 5)),
+                        `Fetching page ${pageCount + 1}... (${allData.length.toLocaleString()} records so far)`
+                    );
+
+                    const result = await dynamodb.query(params).promise();
+
+                    if (result.Items && result.Items.length > 0) {
+                        allData = allData.concat(result.Items);
+                        totalSize += JSON.stringify(result.Items).length;
+
+                        document.getElementById('downloadStats').textContent =
+                            `Records: ${allData.length.toLocaleString()} | Size: ${(totalSize / 1024).toFixed(1)} KB`;
+                    }
+
+                    lastEvaluatedKey = result.LastEvaluatedKey;
+                    pageCount++;
+
+                    if (pageCount > 1000) {
+                        showAlert('Download stopped after 1000 pages to prevent timeout', 'warning');
+                        break;
+                    }
+
+                } while (lastEvaluatedKey);
+
+                updateDownloadProgress(95, 'Processing data for download...');
+
+                if (allData.length === 0) {
+                    showAlert('No data found for the specified criteria', 'warning');
+                    document.getElementById('downloadProgress').style.display = 'none';
+                    return;
+                }
+
+                allData.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                updateDownloadProgress(98, 'Generating file...');
+
+                if (exportFormat === 'csv') {
+                    downloadCSVFile(allData, deviceId, daysFilter);
+                } else {
+                    downloadJSONFile(allData, deviceId, daysFilter);
+                }
+
+                updateDownloadProgress(100, `Download complete! ${allData.length.toLocaleString()} records exported.`);
+
+                setTimeout(() => {
+                    document.getElementById('downloadProgress').style.display = 'none';
+                }, 3000);
+
+                showAlert(`Successfully downloaded ${allData.length.toLocaleString()} records!`, 'success');
+
+            } catch (error) {
+                showAlert('Download failed: ' + error.message, 'error');
+                document.getElementById('downloadProgress').style.display = 'none';
+            }
+        }
+
+        async function refreshHistoricalData() {
+            if (!dynamodb) {
+                showAlert('Please connect to AWS first', 'warning');
+                return;
+            }
+
+            try {
+                const deviceId = document.getElementById('exportDevice')?.value || AWS_CONFIG.defaultDeviceId;
+
+                showAlert('Loading historical data...', 'success');
+
+                let allData = [];
+                let lastEvaluatedKey = null;
+                let pageCount = 0;
+                let totalSize = 0;
+
+                const progressPanel = document.getElementById('downloadProgress');
+                if (progressPanel) {
+                    progressPanel.style.display = 'block';
+                    updateDownloadProgress(0, 'Loading historical data...');
+                }
+
+                do {
+                    const params = {
+                        TableName: AWS_CONFIG.tableName,
+                        KeyConditionExpression: 'deviceId = :deviceId',
+                        ExpressionAttributeValues: {
+                            ':deviceId': deviceId
+                        },
+                        ScanIndexForward: false,
+                        Limit: 1000
+                    };
+
+                    if (lastEvaluatedKey) {
+                        params.ExclusiveStartKey = lastEvaluatedKey;
+                    }
+
+                    if (progressPanel) {
+                        updateDownloadProgress(
+                            Math.min(80, 10 + (pageCount * 5)),
+                            `Loading page ${pageCount + 1}... (${allData.length.toLocaleString()} records so far)`
+                        );
+                    }
+
+                    const result = await dynamodb.query(params).promise();
+
+                    if (result.Items && result.Items.length > 0) {
+                        allData = allData.concat(result.Items);
+                        totalSize += JSON.stringify(result.Items).length;
+
+                        const statsElement = document.getElementById('downloadStats');
+                        if (statsElement) {
+                            statsElement.textContent =
+                                `Records: ${allData.length.toLocaleString()} | Size: ${(totalSize / 1024).toFixed(1)} KB`;
+                        }
+                    }
+
+                    lastEvaluatedKey = result.LastEvaluatedKey;
+                    pageCount++;
+
+                    if (pageCount > 1000) {
+                        showAlert('Loading stopped after 1000 pages to prevent timeout', 'warning');
+                        break;
+                    }
+
+                    if (pageCount % 10 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+
+                } while (lastEvaluatedKey);
+
+                if (progressPanel) {
+                    updateDownloadProgress(90, 'Processing data for charts...');
+                }
+
+                if (allData.length === 0) {
+                    showAlert('No historical data found', 'warning');
+                    if (progressPanel) {
+                        progressPanel.style.display = 'none';
+                    }
+                    return;
+                }
+
+                allData.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+                historicalData = allData;
+
+                if (progressPanel) {
+                    updateDownloadProgress(95, 'Updating charts...');
+                }
+
+                updateHistoricalChart();
+
+                if (progressPanel) {
+                    updateDownloadProgress(100, `Complete! ${allData.length.toLocaleString()} records loaded.`);
+                    setTimeout(() => {
+                        progressPanel.style.display = 'none';
+                    }, 3000);
+                }
+
+                const totalRecordsElement = document.getElementById('totalRecords');
+                if (totalRecordsElement) {
+                    totalRecordsElement.textContent = allData.length.toLocaleString();
+                }
+
+                showAlert(`✅ Loaded ${allData.length.toLocaleString()} historical records for charts and download!`, 'success');
+
+            } catch (error) {
+                showAlert('Error loading historical data: ' + error.message, 'error');
+                const progressPanel = document.getElementById('downloadProgress');
+                if (progressPanel) {
+                    progressPanel.style.display = 'none';
+                }
+            }
+        }
+
+        function updateHistoricalChart() {
+            if (!historicalData || historicalData.length === 0) {
+                return;
+            }
+
+            let chartData = historicalData;
+            const maxChartPoints = 1000;
+
+            if (historicalData.length > maxChartPoints) {
+                const step = Math.floor(historicalData.length / maxChartPoints);
+                chartData = historicalData.filter((_, index) => index % step === 0);
+
+                showAlert(`Chart showing ${chartData.length} sampled points from ${historicalData.length.toLocaleString()} total records for performance`, 'warning');
+            }
+
+            const labels = chartData.map(item => {
+                const date = new Date(item.timestamp * 1000);
+                return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+            });
+
+            const dsTempData = chartData.map(item => item.dsTemp || 0);
+            const shtTempData = chartData.map(item => item.shtTemp || 0);
+            const shtHumData = chartData.map(item => item.shtHum || 0);
+            const tiltData = chartData.map(item => {
+                if (item.tiltStatus === 'UP') return 1;
+                if (item.tiltStatus === 'DOWN') return -1;
+                return 0;
+            });
+
+            const updateMode = chartData.length > 500 ? 'none' : 'default';
+
+            if (historicalTempChart) {
+                historicalTempChart.data.labels = labels;
+                historicalTempChart.data.datasets[0].data = dsTempData;
+                historicalTempChart.data.datasets[1].data = shtTempData;
+                historicalTempChart.update(updateMode);
+            }
+
+            if (historicalHumChart) {
+                historicalHumChart.data.labels = labels;
+                historicalHumChart.data.datasets[0].data = shtHumData;
+                historicalHumChart.update(updateMode);
+            }
+
+            if (historicalTiltChart) {
+                historicalTiltChart.data.labels = labels;
+                historicalTiltChart.data.datasets[0].data = tiltData;
+                historicalTiltChart.update(updateMode);
+            }
+        }
+
+        function downloadCSV() {
+            if (!historicalData || historicalData.length === 0) {
+                showAlert('No historical data loaded. Please load historical data first.', 'warning');
+                return;
+            }
+
+            downloadCSVFile(historicalData, AWS_CONFIG.defaultDeviceId, 'all');
+            showAlert(`✅ Downloaded ${historicalData.length.toLocaleString()} records to CSV!`, 'success');
+        }
+
+        async function getDataStatistics() {
+            if (!dynamodb) {
+                showAlert('Please connect to AWS first', 'warning');
+                return;
+            }
+
+            try {
+                const deviceId = AWS_CONFIG.defaultDeviceId;
+
+                showAlert('Getting data statistics...', 'success');
+
+                const countParams = {
+                    TableName: AWS_CONFIG.tableName,
+                    KeyConditionExpression: 'deviceId = :deviceId',
+                    ExpressionAttributeValues: {
+                        ':deviceId': deviceId
+                    },
+                    Select: 'COUNT'
+                };
+
+                const countResult = await dynamodb.query(countParams).promise();
+                const totalCount = countResult.Count;
+
+                const oldestParams = {
+                    TableName: AWS_CONFIG.tableName,
+                    KeyConditionExpression: 'deviceId = :deviceId',
+                    ExpressionAttributeValues: {
+                        ':deviceId': deviceId
+                    },
+                    ScanIndexForward: true,
+                    Limit: 1
+                };
+
+                const newestParams = {
+                    TableName: AWS_CONFIG.tableName,
+                    KeyConditionExpression: 'deviceId = :deviceId',
+                    ExpressionAttributeValues: {
+                        ':deviceId': deviceId
+                    },
+                    ScanIndexForward: false,
+                    Limit: 1
+                };
+
+                const [oldestResult, newestResult] = await Promise.all([
+                    dynamodb.query(oldestParams).promise(),
+                    dynamodb.query(newestParams).promise()
+                ]);
+
+                const oldestRecord = oldestResult.Items?.[0];
+                const newestRecord = newestResult.Items?.[0];
+
+                let statsMessage = `📊 Data Statistics for ${deviceId}:\n`;
+                statsMessage += `• Total Records: ${totalCount.toLocaleString()}\n`;
+
+                if (oldestRecord && newestRecord) {
+                    const oldestDate = new Date(oldestRecord.timestamp * 1000);
+                    const newestDate = new Date(newestRecord.timestamp * 1000);
+                    const timeSpan = newestDate - oldestDate;
+                    const days = Math.floor(timeSpan / (1000 * 60 * 60 * 24));
+
+                    statsMessage += `• Date Range: ${oldestDate.toLocaleDateString()} to ${newestDate.toLocaleDateString()}\n`;
+                    statsMessage += `• Time Span: ${days} days\n`;
+                    statsMessage += `• Average Records/Day: ${Math.round(totalCount / Math.max(days, 1)).toLocaleString()}`;
+                }
+
+                const totalRecordsElement = document.getElementById('totalRecords');
+                if (totalRecordsElement) {
+                    totalRecordsElement.textContent = totalCount.toLocaleString();
+                }
+
+                showAlert(statsMessage, 'success');
+
+            } catch (error) {
+                showAlert('Error getting statistics: ' + error.message, 'error');
+            }
+        }
+
+        // Initialize dashboards
+        document.addEventListener('DOMContentLoaded', function () {
+            initChart();
+            initHistoricalChart();
+
+            document.getElementById('exportDevice').value = AWS_CONFIG.defaultDeviceId;
+            document.getElementById('deviceId').textContent = AWS_CONFIG.defaultDeviceId;
+
+            // Restore saved control states from localStorage
+            document.getElementById('autoModeToggle').checked = controlStates.autoMode;
+            document.getElementById('heat1Toggle').checked = controlStates.heat1;
+            document.getElementById('heat2Toggle').checked = controlStates.heat2;
+            document.getElementById('humidifierToggle').checked = controlStates.humidifier;
+            document.getElementById('lightToggle').checked = controlStates.light;
+            document.getElementById('tiltUpToggle').checked = controlStates.tiltUp;
+            document.getElementById('tiltDnToggle').checked = controlStates.tiltDn;
+            updateControlUI();
+
+            showAlert('🚀 Dashboard loaded! Connecting to AWS automatically using AWS_CONFIG...', 'success');
+
+            // Check if already logged in this session
+            if (sessionStorage.getItem('dashboard_logged_in') === 'true') {
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+                connectServices();
+            }
+        });
+    </script>
+</body>
+
+</html>
