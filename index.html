@@ -31,12 +31,24 @@
         }
 
         .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
             margin-bottom: 40px;
         }
 
+        .dashboard-logo {
+            width: 100%;
+            max-width: 250px;
+            height: auto;
+            margin-bottom: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
         .header h1 {
-            font-size: 2.8rem;
+            font-size: 2.4rem;
             font-weight: 700;
             background: linear-gradient(135deg, #7f5af0 0%, #3da9fc 100%);
             -webkit-background-clip: text;
@@ -535,7 +547,7 @@
             }
 
             .header h1 {
-                font-size: 2.2rem;
+                font-size: 1.8rem;
             }
 
             .control-button {
@@ -562,13 +574,17 @@
         /* Login Overlay Styles */
         #loginOverlay {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: radial-gradient(circle at 50% 50%, #16161a 0%, #0d0e11 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             z-index: 9999;
         }
+
         .login-box {
             background: rgba(22, 22, 26, 0.75);
             padding: 40px;
@@ -580,11 +596,13 @@
             width: 100%;
             max-width: 400px;
         }
+
         .login-box h2 {
             margin-bottom: 20px;
             font-size: 2rem;
             color: #fffffe;
         }
+
         .login-box input {
             width: 100%;
             padding: 12px 16px;
@@ -596,11 +614,13 @@
             font-size: 1rem;
             text-align: center;
         }
+
         .login-box input:focus {
             outline: none;
             border-color: #7f5af0;
             box-shadow: 0 0 10px rgba(127, 90, 240, 0.2);
         }
+
         .login-box button {
             width: 100%;
             background: linear-gradient(135deg, #7f5af0 0%, #6246ea 100%);
@@ -613,12 +633,15 @@
             cursor: pointer;
             transition: all 0.2s;
         }
+
         .login-box button:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(127, 90, 240, 0.35);
         }
+
         #dashboardContent {
-            display: none; /* Hidden by default until login */
+            display: none;
+            /* Hidden by default until login */
         }
     </style>
 </head>
@@ -629,7 +652,8 @@
         <div class="login-box">
             <h2>🔒 Dashboard Login</h2>
             <p style="color: #94a1b2; margin-bottom: 20px;">Enter password to access</p>
-            <input type="password" id="loginPassword" placeholder="Password" onkeypress="if(event.key === 'Enter') checkLogin()">
+            <input type="password" id="loginPassword" placeholder="Password"
+                onkeypress="if(event.key === 'Enter') checkLogin()">
             <button onclick="checkLogin()">Login</button>
             <p id="loginError" style="color: #ff5a5f; margin-top: 15px; display: none;">Incorrect password</p>
         </div>
@@ -637,8 +661,9 @@
 
     <div class="container" id="dashboardContent">
         <div class="header">
-            <h1>🥚 ESP32 Incubator Live Dashboard</h1>
-            <p>Real-time MQTT control and telemetry monitoring</p>
+            <img src="./logo.jpeg" alt="Incubator Logo" class="dashboard-logo">
+            <h1>🥚 EGG Incubator Live Dashboard</h1>
+            <p>AICRP on MAH MAPUAT UDAIPUR</p>
         </div>
 
         <div class="status-bar">
@@ -654,7 +679,7 @@
             </div>
             <div class="status-item">
                 <strong>Device</strong><br>
-                <span id="deviceId">Test_03</span>
+                <span id="deviceId">Egg Incubator</span>
             </div>
             <div class="status-item">
                 <strong>Last Update</strong><br>
@@ -672,12 +697,8 @@
             <div class="card">
                 <h3>📡 Live Environmental Data</h3>
                 <div class="metric">
-                    <span class="metric-label">DS Temperature</span>
+                    <span class="metric-label">Temperature</span>
                     <span class="metric-value" id="dsTemp">-- °C</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">SHT Temperature</span>
-                    <span class="metric-value" id="shtTemp">-- °C</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Humidity</span>
@@ -713,7 +734,7 @@
                 <div id="manualControls">
                     <div class="control-switch" id="heat1Switch">
                         <div class="control-label">
-                            <span>🔥 Heater 1</span>
+                            <span>🔥 Primary Heater</span>
                             <div class="control-status" id="heat1Status">OFF</div>
                         </div>
                         <label class="switch">
@@ -724,7 +745,7 @@
 
                     <div class="control-switch" id="heat2Switch">
                         <div class="control-label">
-                            <span>🔥 Heater 2</span>
+                            <span>🔥 Secondary Heater </span>
                             <div class="control-status" id="heat2Status">OFF</div>
                         </div>
                         <label class="switch">
@@ -821,21 +842,14 @@
             <div class="card">
                 <h3>🔧 System Status</h3>
                 <div class="metric">
-                    <span class="metric-label">Fan</span>
-                    <span class="metric-value" id="fanStatus">OFF</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">ESP32 Timestamp</span>
+                    <span class="metric-label"> Timestamp</span>
                     <span class="metric-value" id="espTimestamp">--</span>
                 </div>
                 <div class="metric">
                     <span class="metric-label">Data Age</span>
                     <span class="metric-value" id="dataAge">--</span>
                 </div>
-                <div class="metric">
-                    <span class="metric-label">Update Frequency</span>
-                    <span class="metric-value" id="updateFreq">--</span>
-                </div>
+
                 <div class="metric">
                     <span class="metric-label">Total Historical Records</span>
                     <span class="metric-value" id="totalRecords">0</span>
@@ -847,15 +861,7 @@
                     <button class="control-button secondary" onclick="stopLiveData()">⏹️ Stop Live</button>
                     <button class="control-button secondary" onclick="testCommand()">🧪 Test Command</button>
                 </div>
-                <div class="input-group" style="margin-top: 15px;">
-                    <label for="pollInterval">Data Refresh Rate</label>
-                    <select id="pollInterval" onchange="if (isConnected) startLiveData();">
-                        <option value="1000">1 second (Fast)</option>
-                        <option value="2000" selected>2 seconds (Normal)</option>
-                        <option value="5000">5 seconds (Slow)</option>
-                        <option value="10000">10 seconds (Very Slow)</option>
-                    </select>
-                </div>
+
             </div>
 
             <div class="card chart-full">
@@ -935,7 +941,7 @@
                 <button class="control-button" onclick="getDataStatistics()">📈 Get Statistics</button>
                 <button class="control-button" onclick="refreshHistoricalData()">📊 Load Historical Data</button>
                 <button class="control-button" onclick="downloadCSV()">📥 Download CSV</button>
-                <button class="control-button" onclick="downloadAllData()">📦 Download (Custom Range/Format)</button>
+
             </div>
 
             <div class="download-progress" id="downloadProgress">
@@ -959,7 +965,7 @@
                 document.getElementById('dashboardContent').style.display = 'block';
                 document.getElementById('loginError').style.display = 'none';
                 sessionStorage.setItem('dashboard_logged_in', 'true');
-                
+
                 if (!isConnected) {
                     connectServices();
                 }
@@ -1060,8 +1066,8 @@
                 data: {
                     labels: [],
                     datasets: [
-                        { label: 'DS Temperature (°C)', data: [], borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.05)', tension: 0.4, pointRadius: 3 },
-                        { label: 'SHT Temperature (°C)', data: [], borderColor: '#3da9fc', backgroundColor: 'rgba(61, 169, 252, 0.05)', tension: 0.4, pointRadius: 3 }
+                        { label: 'Temperature (°C)', data: [], borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.05)', tension: 0.4, pointRadius: 3 },
+
                     ]
                 },
                 options: options
@@ -1999,7 +2005,7 @@
             initHistoricalChart();
 
             document.getElementById('exportDevice').value = AWS_CONFIG.defaultDeviceId;
-            document.getElementById('deviceId').textContent = AWS_CONFIG.defaultDeviceId;
+            // document.getElementById('deviceId').textContent = AWS_CONFIG.defaultDeviceId; // Keep custom UI name
 
             // Restore saved control states from localStorage
             document.getElementById('autoModeToggle').checked = controlStates.autoMode;
