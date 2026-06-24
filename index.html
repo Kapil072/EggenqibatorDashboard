@@ -40,7 +40,7 @@
 
         .dashboard-logo {
             width: 100%;
-            max-width: 250px;
+            max-width: 180px;
             height: auto;
             margin-bottom: 15px;
             border-radius: 12px;
@@ -48,7 +48,7 @@
         }
 
         .header h1 {
-            font-size: 2.4rem;
+            font-size: 2.8rem;
             font-weight: 700;
             background: linear-gradient(135deg, #7f5af0 0%, #3da9fc 100%);
             -webkit-background-clip: text;
@@ -547,7 +547,7 @@
             }
 
             .header h1 {
-                font-size: 1.8rem;
+                font-size: 2.2rem;
             }
 
             .control-button {
@@ -679,7 +679,7 @@
             </div>
             <div class="status-item">
                 <strong>Device</strong><br>
-                <span id="deviceId">Egg Incubator</span>
+                <span id="deviceId">Test_03</span>
             </div>
             <div class="status-item">
                 <strong>Last Update</strong><br>
@@ -734,7 +734,7 @@
                 <div id="manualControls">
                     <div class="control-switch" id="heat1Switch">
                         <div class="control-label">
-                            <span>🔥 Primary Heater</span>
+                            <span>🔥 Heater 1</span>
                             <div class="control-status" id="heat1Status">OFF</div>
                         </div>
                         <label class="switch">
@@ -745,7 +745,7 @@
 
                     <div class="control-switch" id="heat2Switch">
                         <div class="control-label">
-                            <span>🔥 Secondary Heater </span>
+                            <span>🔥 Heater 2</span>
                             <div class="control-status" id="heat2Status">OFF</div>
                         </div>
                         <label class="switch">
@@ -803,7 +803,7 @@
 
                 <div class="metric" style="margin-top: 15px;">
                     <span class="metric-label">Current Tilt Status</span>
-                    <span class="metric-value" id="tiltStatus">STOP</span>
+                    <span class="metric-value" id="tiltStatus">UP</span>
                 </div>
             </div>
 
@@ -842,7 +842,7 @@
             <div class="card">
                 <h3>🔧 System Status</h3>
                 <div class="metric">
-                    <span class="metric-label"> Timestamp</span>
+                    <span class="metric-label">Timestamp</span>
                     <span class="metric-value" id="espTimestamp">--</span>
                 </div>
                 <div class="metric">
@@ -1066,8 +1066,7 @@
                 data: {
                     labels: [],
                     datasets: [
-                        { label: 'Temperature (°C)', data: [], borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.05)', tension: 0.4, pointRadius: 3 },
-
+                        { label: 'Temperature (°C)', data: [], borderColor: '#ff6384', backgroundColor: 'rgba(255, 99, 132, 0.05)', tension: 0.4, pointRadius: 3 }
                     ]
                 },
                 options: options
@@ -1205,7 +1204,7 @@
                 clearInterval(liveDataInterval);
             }
 
-            const pollInterval = parseInt(document.getElementById('pollInterval').value);
+            const pollInterval = 2000; // Hardcoded to 2 seconds
 
             liveDataInterval = setInterval(fetchLatestData, pollInterval);
             updateStatus('data', 'online');
@@ -1269,7 +1268,6 @@
 
         function updateLiveDisplay(data) {
             document.getElementById('dsTemp').textContent = `${data.dsTemp ?? '--'} °C`;
-            document.getElementById('shtTemp').textContent = `${data.shtTemp ?? '--'} °C`;
             document.getElementById('shtHum').textContent = `${data.shtHum ?? '--'} %`;
 
             const tankElement = document.getElementById('tankFull');
@@ -1281,13 +1279,14 @@
             sensorElement.className = `metric-value ${data.sensorError ? 'error' : 'success'}`;
 
             document.getElementById('espTimestamp').textContent = data.timestamp ?? '--';
-            document.getElementById('fanStatus').textContent = data.fan ? 'ON' : 'OFF';
 
             document.getElementById('currentTempThreshold').textContent = `${data.tempThreshold ?? '--'} °C`;
             document.getElementById('currentHumThreshold').textContent = `${data.humThreshold ?? '--'} %`;
             document.getElementById('currentInterval').textContent = `${data.schedIntervalMin ?? '--'} min`;
 
-            document.getElementById('tiltStatus').textContent = data.tiltStatus || 'STOP';
+            if (data.tiltStatus && data.tiltStatus !== 'STOP') {
+                document.getElementById('tiltStatus').textContent = data.tiltStatus;
+            }
         }
 
         function updateControlStatesFromData(data) {
@@ -1405,7 +1404,6 @@
 
             realtimeTempChart.data.labels = labels;
             realtimeTempChart.data.datasets[0].data = realtimeData.map(d => d.dsTemp);
-            realtimeTempChart.data.datasets[1].data = realtimeData.map(d => d.shtTemp);
             realtimeTempChart.update('active');
 
             realtimeHumChart.data.labels = labels;
@@ -1895,7 +1893,6 @@
             if (historicalTempChart) {
                 historicalTempChart.data.labels = labels;
                 historicalTempChart.data.datasets[0].data = dsTempData;
-                historicalTempChart.data.datasets[1].data = shtTempData;
                 historicalTempChart.update(updateMode);
             }
 
@@ -2005,7 +2002,7 @@
             initHistoricalChart();
 
             document.getElementById('exportDevice').value = AWS_CONFIG.defaultDeviceId;
-            // document.getElementById('deviceId').textContent = AWS_CONFIG.defaultDeviceId; // Keep custom UI name
+            document.getElementById('deviceId').textContent = AWS_CONFIG.defaultDeviceId;
 
             // Restore saved control states from localStorage
             document.getElementById('autoModeToggle').checked = controlStates.autoMode;
